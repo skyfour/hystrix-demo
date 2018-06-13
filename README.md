@@ -1,4 +1,4 @@
-# # hystrix-demo
+# hystrix-demo
 
 主要希望通过本demo来介绍[Hystrix](https://github.com/Netflix/Hystrix/wiki)的使用, 在我看来, 这个类库可能是当前最为重要的类库之一
 
