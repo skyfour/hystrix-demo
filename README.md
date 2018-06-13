@@ -5,6 +5,90 @@
 不管是其引入的断路器的概念还是其使用, 都是一个现代技术堆栈中必须的, 也是当下程序员需要熟练掌握的技术.
 
 
+## demo介绍
+
+首先, 按照一个spring boot程序的方式启动, 本demo没有任何其他需要依赖的资源.
+
+
+然后可以执行
+
+```
+curl http://127.0.0.1:8080/count-with-hystrix
+```
+
+从这里可以看到返回值是一个不断递增的数字, 具体实现参见 `com.easemob.demo.hystrixdemo.service.BookStoreServiceImpl#getBookCount`
+
+ 如果看服务的日志输出的话, 可以看到
+
+```
+2018-06-14 01:29:55.286 DEBUG 6061 --- [nio-8080-exec-9] c.e.d.h.rest.RestDemoController          : running into /count-with-hystrix api call,
+	 这个command是否成功执行 : true
+	 当前断路器是否打开: false
+	 返回值是否走的fallback: false
+	 请求是否超时: false
+	 这个command的执行时间是 1毫秒
+```
+
+### 模拟后端服务超时
+
+可以执行 `curl http://127.0.0.1:8080/count-with-hystrix?sleep=1000`
+
+其中`sleep`参数表示让后端的服务模拟执行耗时需要1s的情况, 这时候可以看到这个请求的返回值为`-1`, 状态码为200,
+
+ 并且可以在程序的日志中看到
+
+```
+2018-06-14 01:34:31.565 ERROR 6061 --- [eCommandGroup-6] c.e.d.h.service.BookStoreServiceImpl     : sleep in getBookCount was interrupted
+2018-06-14 01:34:31.565 DEBUG 6061 --- [nio-8080-exec-7] c.e.d.h.rest.RestDemoController          : running into /count-with-hystrix api call,
+	 这个command是否成功执行 : false
+	 当前断路器是否打开: false
+	 返回值是否走的fallback: true
+	 请求是否超时: true
+	 这个command的执行时间是 303毫秒
+```
+
+从日志中可以看到, 这个请求在hystrix看来是超时了, 整个command的执行时间为303毫秒
+
+这是因为在application.properties中有`hystrix.command.bookStoreServiceGetCount.execution.isolation.thread.timeoutInMilliseconds=300`这个配置, 也就是指定了这个command的超时时间为300毫秒, 而上面我们在模拟1s的情况, 所以会超时, 但是这时候hystrix的fallback机制起作用了, 所以我们看到的http请求是200成功, 并得到了fallback的值-1 (参见com.easemob.demo.hystrixdemo.service.GetBookCountHystrixCommand#getFallback)
+
+### 模拟后端服务异常
+
+可以执行`curl http://127.0.0.1:8080/count-with-hystrix?exception=true`
+
+其中, exception的参数可以让后端服务来模拟抛出异常的情况, 可以看到这个时候, 我们的http的response依然是-1, 并且状态码是200
+
+但是在日志中, 可以看到这个返回值也都了fallback
+
+```
+2018-06-14 01:37:51.197 DEBUG 6061 --- [nio-8080-exec-9] c.e.d.h.rest.RestDemoController          : running into /count-with-hystrix api call,
+	 这个command是否成功执行 : false
+	 当前断路器是否打开: false
+	 返回值是否走的fallback: true
+	 请求是否超时: false
+	 这个command的执行时间是 1毫秒
+```
+
+
+### 使用wrk模拟压测
+
+[GitHub - wg/wrk: Modern HTTP benchmarking tool](https://github.com/wg/wrk) 是一个常见的类似ab的压测工具, 我们可以在本机模拟不停的发请求
+
+mac上面使用brew安装 `brew install wrk`, 具体wrk的使用请参考wrk自己的文档, 很简单, 在此不做详述.
+
+
+首先在本机的浏览器中打开[Hystrix Dashboard](http://127.0.0.1:8080/hystrix), 并在界面中填写`http://127.0.0.1:8080/hystrix.stream`
+
+然后在命令行执行
+
+`wrk -c 10 -d 20s -t 10 http://127.0.0.1:8080/count-with-hystrix?randomsleep=true`
+
+这里的`randomsleep`参数会让后端服务对每个请求随机产生*0-500*毫秒的延迟, 来模拟现实情况, 这时候可以在上面的网页中看到hystrix起的作用
+
+
+> 最好调整application.properties中的logging.level.com.easemob.demo.hystrixdemo.rest.RestDemoController=debug 为info级别, 不然日志太多,机器相应慢
+
+
+
 ## Hystrix  介绍
 
 简单来说, hystrix提供了一个简单且优雅的方案来让你的系统实现自动降级和恢复.
