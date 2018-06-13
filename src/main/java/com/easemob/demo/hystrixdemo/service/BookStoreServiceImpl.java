@@ -27,7 +27,8 @@ public class BookStoreServiceImpl implements BookStoreService {
     public long getBookCount(int sleepInMillseconds,boolean randomSleep, boolean shouldThrowException) {
         //如果设置了模拟延时, 那么这里通过sleep来模拟这个方法的执行时间
         if(randomSleep){
-            sleepInMillseconds = new Random().nextInt(5000);
+            //如果设置了随机延迟, 那么随机生成一个在0到500之间的数字作为延迟的毫秒数
+            sleepInMillseconds = new Random().nextInt(500);
         }
         if (sleepInMillseconds > 0) {
             try {
